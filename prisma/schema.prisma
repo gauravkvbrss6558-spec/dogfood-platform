@@ -1,0 +1,343 @@
+// This file defines every table in the database.
+// Run `npm run db:push` after changing this to update the DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PARTICIPANT
+  JUDGE
+  ORGANIZER
+  ADMIN
+}
+
+enum TeamMemberRole {
+  LEADER
+  MEMBER
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+model User {
+  id              String       @id @default(cuid())
+  name            String
+  email           String       @unique
+  passwordHash    String
+  role            UserRole     @default(PARTICIPANT)
+  // null until the registration OTP is verified. Login is blocked while
+  // this is null (see lib/auth.ts) — this is what makes verification
+  // mandatory rather than cosmetic.
+  emailVerifiedAt DateTime?
+  createdAt       DateTime     @default(now())
+
+  organizedEvents Event[]      @relation("EventOrganizer")
+  teamMemberships TeamMember[]
+  judgingFor      EventJudge[]
+  judgeAssignments JudgeAssignment[]
+  votes           Vote[]
+  comments        Comment[]
+  auditLogs       AuditLog[]
+}
+
+model Event {
+  id                  String   @id @default(cuid())
+  name                String
+  slug                String   @unique
+  description         String
+  startAt             DateTime
+  endAt               DateTime
+  submissionDeadline  DateTime
+  createdAt           DateTime @default(now())
+
+  // Community voting is off by default and organizer-configured — an
+  // event that never enables it behaves exactly like a T1/T2 event, with
+  // no voting UI shown and no vote data collected.
+  votingEnabled       Boolean   @default(false)
+  votingOpensAt       DateTime?
+  votingClosesAt      DateTime?
+
+  organizerId         String
+  organizer           User     @relation("EventOrganizer", fields: [organizerId], references: [id])
+
+  tracks              Track[]
+  prizes              Prize[]
+  teams               Team[]
+  rubric              Rubric?
+  eventJudges         EventJudge[]
+  judgeAssignments    JudgeAssignment[]
+  webhooks            Webhook[]
+}
+
+model Track {
+  id       String @id @default(cuid())
+  name     String
+  eventId  String
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  submissions Submission[]
+}
+
+model Prize {
+  id          String @id @default(cuid())
+  title       String
+  description String
+  eventId     String
+  event       Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Team {
+  id         String       @id @default(cuid())
+  name       String
+  inviteCode String       @unique
+  eventId    String
+  createdAt  DateTime     @default(now())
+
+  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  members    TeamMember[]
+  submission Submission?
+
+  @@unique([eventId, name])
+}
+
+model TeamMember {
+  id     String         @id @default(cuid())
+  teamId String
+  userId String
+  role   TeamMemberRole @default(MEMBER)
+
+  team   Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model Submission {
+  id          String            @id @default(cuid())
+  teamId      String            @unique
+  title       String
+  description String
+  repoUrl     String?
+  demoUrl     String?
+  trackId     String?
+  status      SubmissionStatus  @default(DRAFT)
+  submittedAt DateTime?
+  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime          @default(now())
+
+  team        Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  track       Track?            @relation(fields: [trackId], references: [id])
+  judgeAssignments JudgeAssignment[]
+  votes       Vote[]
+  comments    Comment[]
+}
+
+// ---------------------------------------------------------------------
+// Judging (Tier 2)
+// ---------------------------------------------------------------------
+
+// One rubric per event. A rubric is a set of weighted criteria that every
+// judge scores every assigned submission against.
+model Rubric {
+  id      String @id @default(cuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  criteria RubricCriterion[]
+}
+
+model RubricCriterion {
+  id       String @id @default(cuid())
+  rubricId String
+  rubric   Rubric @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+
+  name     String
+  // Weight is a fraction of the total (e.g. 0.3 = 30%). Weights across a
+  // rubric's criteria are expected to sum to 1.0 — enforced in the API,
+  // not the database, since Prisma can't express a cross-row SUM constraint.
+  weight   Float
+  maxScore Int    @default(10)
+
+  scores   Score[]
+}
+
+// Marks a user as an invited judge for a specific event. A user can judge
+// more than one event, and an event can have many judges — this join
+// table is what "judge invitation" means at the data level.
+model EventJudge {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  invitedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+// The result of running the assignment algorithm: judge X is assigned to
+// score submission Y. Scores hang off this row, not directly off the
+// judge or submission, so "has this judge finished this submission" is a
+// single lookup.
+model JudgeAssignment {
+  id           String   @id @default(cuid())
+  eventId      String
+  judgeId      String
+  submissionId String
+  createdAt    DateTime @default(now())
+
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judge      User       @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  scores Score[]
+
+  @@unique([judgeId, submissionId])
+}
+
+model Score {
+  id           String @id @default(cuid())
+  assignmentId String
+  criterionId  String
+  value        Float
+
+  assignment JudgeAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  criterion  RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, criterionId])
+}
+
+// ---------------------------------------------------------------------
+// Public — community voting, comments, audit (Tier 3)
+// ---------------------------------------------------------------------
+
+// A community rating (1-5) rather than a plain upvote — see PUBLIC.md /
+// ARCHITECTURE.md for why. One vote per (submission, voter), enforced at
+// the database level, which is the primary duplicate-detection mechanism:
+// a logged-in user simply cannot vote twice on the same project.
+model Vote {
+  id           String   @id @default(cuid())
+  submissionId String
+  voterId      String
+  value        Int
+  // Hashed, never the raw IP — used only for the secondary, non-blocking
+  // duplicate-detection signal described in ARCHITECTURE.md (e.g. many
+  // accounts voting from the same address in a short window).
+  ipHash       String
+  createdAt    DateTime @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  voter      User       @relation(fields: [voterId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, voterId])
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  submissionId String
+  authorId     String
+  body         String
+  createdAt    DateTime @default(now())
+  // Soft delete: keeps the audit trail intact (an organizer can still see
+  // *that* a comment existed and was removed, and by whom) rather than
+  // erasing the row, which would break AuditLog references and make abuse
+  // patterns (e.g. rapid post-then-delete spam) invisible after the fact.
+  deletedAt    DateTime?
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+// A general-purpose, append-only log of abuse-relevant actions (votes,
+// comments, comment deletions). Never updated or deleted by application
+// code — if an entry needs correcting, a new entry is appended, the same
+// principle as financial ledgers. This is what "audit trails" means at
+// the data level: a reconstructable history, not just current state.
+model AuditLog {
+  id        String   @id @default(cuid())
+  // e.g. "VOTE_CAST", "COMMENT_POSTED", "COMMENT_DELETED". Not a foreign
+  // key to any table — this is a label describing what kind of action
+  // happened, read by humans and by the duplicate-detection report.
+  eventType String
+  // The hackathon Event's id, when applicable — a plain string, not a
+  // Prisma relation, since audit rows should survive even if the
+  // underlying event/submission/comment is later deleted.
+  hackathonEventId String?
+  actorId   String?
+  ipHash    String?
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([actorId, eventType, createdAt])
+  @@index([ipHash, eventType, createdAt])
+}
+
+// ---------------------------------------------------------------------
+// Stretch (Tier 4) — webhooks, signed records, keypair
+// ---------------------------------------------------------------------
+
+// An organizer-registered outbound webhook. `secret` is used to HMAC-sign
+// the delivered payload (see lib/webhookSigning.ts) so the receiver can
+// verify a delivery actually came from this platform, the same pattern
+// GitHub/Stripe use for their webhooks.
+model Webhook {
+  id         String   @id @default(cuid())
+  eventId    String
+  url        String
+  secret     String
+  // Comma-separated event type names (e.g. "SUBMISSION_SUBMITTED,VOTE_CAST").
+  // Kept as a plain string rather than a join table to a fixed enum list —
+  // new event types shouldn't require a schema migration to subscribe to.
+  eventTypes String
+  createdAt  DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+// A single, server-wide Ed25519 keypair used to sign certificates and
+// judge participation records. Asymmetric (not the HMAC secret used for
+// webhooks) *on purpose*: a certificate needs to be verifiable by anyone,
+// forever, using only the published public key — without that verifier
+// needing to trust a live API call to this server, or share a secret
+// with it. See ARCHITECTURE.md for the full reasoning and its limits.
+//
+// Single-row table: the application always reads/creates exactly one row.
+model ServerKeypair {
+  id         String   @id @default(cuid())
+  publicKey  String
+  privateKey String
+  createdAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// Email OTP verification
+// ---------------------------------------------------------------------
+
+// A short-lived one-time code sent to an email address to prove the
+// registrant actually controls it. Stored hashed, never in plaintext —
+// same principle as passwords: if the database leaks, the codes in it
+// shouldn't be directly usable (though they're short-lived anyway, so the
+// blast radius is small regardless).
+model EmailOtp {
+  id          String    @id @default(cuid())
+  email       String
+  codeHash    String
+  purpose     String    @default("REGISTRATION")
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email, purpose, createdAt])
+}
