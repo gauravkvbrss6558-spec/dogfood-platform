@@ -1,0 +1,19 @@
+[portal]
+base_url = "http://localhost:3000"
+
+[tiers]
+claimed = ["T1", "T2", "T3", "T4"]
+pitch = "Self-hostable hackathon submission + judging platform."
+
+[auth]
+organizer   = "Cookie: next-auth.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..5A5XVeBOSbYGJB7T.ZsXD94-lo1UngKreKRg5NaBLwGcYK2pP0CdijmzRY-o9AoY1ggrb05bKoKiLSvFP8Xm2fUvH3w4aoe7dUVC43eS5dEpTtaXgB-U1GBAv8dt9nlTJ3UcQaU71G7Dw_AwjUbBeEB49u1IqAdGi8KQaMI-5ofWofWK03PJwNofEx5Yp4CE28H0TFvdFUR12OVF5qCquTndQYVra4t5n36jd1Qv8QmypFg--KuHBKi-f-GK8yoA1y1RqCdPXJoaOyfWfqOHUxNYGmQLmswSjShhdRGr-fUZbLi_FDviZkFemUA.TBqKf2oWbw2bfiFvvua4bw"
+judge_a     = "Cookie: next-auth.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..M2YUH0I9AiuHX4RH.Oytwys2tKzq64zup3DlZBIsgn9UkNDL_w0IxaAIS-L04uz5rjIZj4-98UDK1YK6vfEQSbvkQGMPTZUlLpkrp0EoR7ZidsLv62gUUDjTJlYDfsQpu4CKNGqwXkOOr4US8VUVvG1zbx_iQHqv9zwL7t79J59_FozghJe3c_YJTlYPXB6iObOyylus1LrwHolnije8dt2Sfc7DNrPkawXljfN7q_XiX3SRCGxdQfLVfCJly_DjJ0nML_CbwvwAAiKvpGLu3y5h0DXbnExwvsPKVAAiMvTtyvVCb.-LmzvsqIkwzClFiXSSB-EQ"
+judge_b     = "Cookie: next-auth.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..Btm9YSvoHQ0J6AIH.jntcA3B7OOO47Qz-cjI6Zn5gg3DtCHNhA_zFE1xOFjGV0ZBi4fhG4x9P6Gq5SNOM1FYAwE9F_HhP521QZtgDcIoUh-J967oj5X5b5H42JfdV5Gb8iuQ5QCjE87ff_DVAk-vZdz0eDAonqfmvYduyIZlNe2ZL3MmXiiIpkdK424gWgLCdyVVh6qNz0XQlF-ofYl2O1q50oM8JZEZ_ovEPFF0zRH_-SHZXhrNLmLGP3KsHZsf47HQAZ1WceApqIadJZhcekM4alSr-HSSolsRG-UY7cu9x.MRKLRpohEHDutXiKjT-Uvw"
+participant = "Cookie: next-auth.session-token=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..oiOMVnCsYte2eOxc.4HXZlFF93NIAdtkD4WE3fZ1Iy2dlgU_SEMDieMOkdtuaajoWDPcwxCG76iJH81CqkUSp7XHklhym9sf_w4iBik3ih-CzmKhfmcNCDGelbLiLrQDNkwk1jiGCJPuUyC4SLbd2qZzPsLEVkVzeGA_UTTjuoNE--fTSLyMFSVeloBD02s7_1N48R71yuty6ThkIbi9dFZeEWbpUfrAcm7rYjV7oA2_e8jqWTCylcCSV3f6fltVVzscfLglKYn98MCPZa7qi1pdCI2P07aNnvyuqo26Ev6fKVRPUAx80wpUXRw.tWP8jgUCOdVrtvpfSKm5pA"
+
+[routes]
+gallery      = "/gallery"
+submit       = "/api/submissions"
+judge_scores = "/api/judge/scores"
+peer_scores  = "/api/judge/scores?judge=cmuf7c79y000211ycfzba0zj1"
+csv_export   = "/api/events/cmtzedg3c000612a496h5odm0/export/scores"

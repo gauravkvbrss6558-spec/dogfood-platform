@@ -1,0 +1,39 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-paper text-ink;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  @apply font-display;
+}
+
+input,
+textarea,
+select {
+  @apply bg-surface text-ink border-line;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  @apply border-signal outline-none;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dogfood
+      POSTGRES_PASSWORD: dogfood
+      POSTGRES_DB: dogfood
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogfood"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://dogfood:dogfood@db:5432/dogfood
+      NEXTAUTH_SECRET: dev-only-change-me-before-real-use
+      NEXTAUTH_URL: http://localhost:3000
+      # Optional — leave unset for zero-setup console/dev-mode OTP delivery.
+      # Set these in a .env file next to docker-compose.yml (or export them
+      # in your shell before running `docker compose up`) to send real
+      # email instead. See .env.example for the full list of options.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+    ports:
+      - "3000:3000"
+    command: sh -c "npx prisma db push && npm run db:seed && npm run print:auth && npm run start"
+
+volumes:
+  db_data:
